@@ -9,6 +9,7 @@ from scipy import stats
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as plticker 
 import seaborn as sns
 
 """
@@ -373,6 +374,55 @@ def multiSummaryStats(data, chosen_features = [], r = 3):
         itn += 1
     
     return summarised_stats
+
+def corr2(data, features, r = 5, cg = True):
+    
+    """
+    Find the correlation between two features
+
+    Parameters
+    ----------
+    data : LIST
+        list of pandas dataframe(s).
+    features : LIST
+        Features to include.
+    r : INT, optional
+        Rounding value. The default is 5.
+    cg : BOOL, optional
+        Coloured text indicating correlation strength. The default is True.
+
+    Returns
+    -------
+    PANDAS_DATAFRAME
+        returns the correlation dataframe for each country.
+
+    """
+    correlations = []
+
+    for df in data:
+        df = df[features]  # Create a df with only desired features
+
+        corr = df.corr()  # Calculate the correlation
+        corr = corr.iloc[0][1]  # obtain correlation value
+        corr = np.round(corr, r)  # round value
+        
+        if cg is True:  # if colour grading is true
+            if (corr <= -0.5):
+                corr = (f'{Fore.RED}{corr}')
+            elif (corr >= 0.5):
+                corr = (f'{Fore.GREEN}{corr}')
+            else:
+                corr = (f'{Fore.YELLOW}{corr}')
+            corr += f'{Fore.RESET}'
+
+        correlations.append(corr)
+    corr_df = pd.DataFrame(correlations, columns = ['Pearson Coefficient'], 
+                           index = country_names)
+    print(corr_df)
+
+    return (corr_df.transpose())
+
+
 """
 
 *** CODE ***
@@ -445,3 +495,39 @@ plotTimeSeries(data, 'GDP ($)', 'CO2 Emissions',
 
 # Plotting pairplot to observe any correlations between variables
 # sns.pairplot(uk);  # commented out as very intensive to run each time
+
+# Creating a snapshot data of 1990 & 2014 (the last datapoint for fossil fuels)
+years = [1990, 2014]
+snapshot_data = []
+# Cylcing through to do two years at a time
+for year in years:
+    snapshot = snapshotData(clean_data, year, data_name, normalise = False)
+    # Refining to only observe Fossil Fuels and Rewnewables
+    snapshot = snapshot[['Renewable Use', 'Fossil Fuel Use']]
+    
+    # Creating a list of df
+    snapshot_data.append(snapshot)
+
+# Extracting values
+d1990, d2015 = snapshot_data
+d1990.corrwith(d2015)
+
+# Plotting hbar graph
+_, ax = plt.subplots()
+
+diff2015 = d2015 - d1990  # calculating difference to better show the change
+
+loc = plticker.MultipleLocator(base = 5.0)  # make ticks at regular intervals
+ax.xaxis.set_major_locator(loc)
+ax.set_xlabel('% Change')
+ax.xaxis.set_minor_locator(plticker.AutoMinorLocator(5))
+ax.grid(which = 'minor', alpha = 0.1)
+ax.grid(which = 'major', alpha = 0.5)
+
+diff2015.plot(kind='barh', ax = ax, alpha = 1, width = 0.9, grid = True, 
+              color = ['#0096c7', '#023e8a'])
+
+# Observing correlation GDP against fossil fuels and renewable energy 
+ff = corr2(data, ['GDP ($)', 'Fossil Fuel Use'])
+re = corr2(data, ['GDP ($)', 'Renewable Use'])
+

@@ -3,7 +3,12 @@ This program is designed to take in data and return plots and statistical
 summaries which will be presented in a clean, readable format
 """
 # Import the modules needed
+from datetime import date
+from colorama import Fore, Style
+from scipy import stats
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 import seaborn as sns
 
 """
@@ -136,6 +141,238 @@ def snapshotData(data, year, feature_names=[], normalise = True):
     
     return snapshot
 
+def plotTimeSeries(data, y1, y2,
+                   labels=['Title', 'X-axis', 'Y-axis(left)', 'Y-axis(right)'],
+                   asset_set=['Feature_1', 'Feature_1'],
+                   color_set=['#2077b4', '#f38043'],
+                   save_file=False,
+                   produce_summary=False):
+
+    """
+    Parameters
+    ----------
+    data : List
+        An array of the desired datasets to plot.
+    y1 : String
+        Left Y axis value.
+    y2 : String
+        Right Y axis value.
+    labels : List
+        list of labels: Title;X;Y1;Y2, enter '' to skip a given element.
+    asset_set : List
+        set of each currency being plotted.
+    color_set : List
+        set of two colours.
+    save_file : Bool
+        Save file as a .png, default = False.
+    produce_summary : Bool
+        Produces summary stats (Min, Max, Mean) and the spearman between
+        y1 & y2, default = True.
+
+    Returns
+    -------
+    Shows a plot for each respective element in 'data', with option to save
+    graphics and produce a summary
+    """
+    print(f'\n*** {Fore.YELLOW + Style.BRIGHT}STARTING:{Fore.RESET}',
+          'plotTimeSeries ***')
+    if len(labels) == 2:
+        labels.extend([y1, y2])
+    else:
+        pass
+    
+    # Unpacking lists
+    try:
+        gen_title, x_label, y1_label, y2_label = labels
+    except:
+        print(f"{Fore.RED + Style.BRIGHT}ERROR:{Fore.RESET} Labels is missing",
+              f"{(4 - len(labels))} parameters")
+        print(f'*** {Fore.YELLOW + Style.BRIGHT}ENDING:{Fore.RESET}',
+              'plotTimeSeries ***\n')
+        return
+    color_a, color_b = color_set
+
+    current_date = date.today().strftime('%d-%m-%Y')
+
+    # Establishing variables
+    itn = 0
+
+    for df in data:
+
+        title = f'{asset_set[itn]}: {gen_title}'
+        itn += 1
+
+        fig, ax1 = plt.subplots()
+
+        ax1.tick_params(axis='x', rotation=45)
+        ax1.title.set_text(title)
+        ax1.set_xlabel(x_label)
+        ax1.set_ylabel(y1_label)
+        ax1.grid(True)
+        ax1.fill_between(df.index, df[y1], alpha=0.25)
+
+        _plt = ax1.plot(df.index, df[y1])
+
+        ax2 = ax1.twinx()
+        ax2.set_ylabel(y2_label)
+
+        _plt2 = ax2.plot(df.index, df[y2], color=color_set[1])
+
+        plt.legend([_plt[0], _plt2[0]], [y1_label, y2_label])
+        plt.show()
+
+        if save_file is True:
+            file_name = (f'./plots/{title}_{current_date}.png')
+            print(f'{Fore.MAGENTA + Style.BRIGHT}SAVING:{Fore.RESET} ',
+                  f'{file_name}')
+            fig.savefig((file_name),
+                        format='png',
+                        dpi=120,
+                        bbox_inches='tight')
+
+        if produce_summary is True:
+            print(f'\nProducing Summary for {Fore.YELLOW + Style.BRIGHT}',
+                  f'{asset_set[itn-1]}:{Fore.RESET}\n')
+            all_features = [y1, y2]
+            total_summary = []
+            # Basic summary
+            for feature in all_features:
+                summary = []
+                summary.append(np.max(df[feature]))
+                summary.append(np.min(df[feature]))
+                summary.append(np.mean(df[feature]))
+
+                total_summary.append(summary)
+            feature_df = pd.DataFrame(total_summary,
+                                      columns=(['Maximum', 'Minimum', 'Mean']),
+                                      index=(all_features))
+            feature_df = feature_df.transpose()
+
+            spearman = stats.spearmanr(df[y1], df[y2], nan_policy = 'omit')
+            print(feature_df)
+            print('\nSpearman R Coefficient:\n',
+                  f'{Fore.BLUE + Style.BRIGHT}Correlation:{Fore.RESET} ',
+                  f'{spearman[0]:.4f}\n',
+                  f'{Fore.BLUE + Style.BRIGHT}P-Value:{Fore.RESET} ',
+                  f'{spearman[1]}\n')
+
+    print(f'*** {Fore.YELLOW + Style.BRIGHT}ENDING:{Fore.RESET} ',
+          'plotTimeSeries ***\n')
+    return
+
+def seperateCountry(data, data_name, countries):
+
+    """
+    Seperate the country from the data to have country specific df
+
+    Parameters
+    ----------
+    data : LIST
+        list containing pandas dataframe(s)..
+    data_name : LIST
+        list containing desired features to out into df.
+    countries : LIST
+        list contraining countries to seperate.
+
+    Returns
+    -------
+    country_data : LIST
+        List containing country specific data in the order of countries.
+
+    """
+    
+    # Create empty lists
+    country_data = []
+    country_list = []
+    
+    for j in range(len(countries)):
+        target_country = countries[j]
+        country_list.append(target_country)
+
+        for i in range(len(data)):
+
+            df = data[i][target_country]
+
+            if i == 0:  # for the first itn create a df
+                temp_df = pd.DataFrame(df)
+                temp_df = temp_df.rename(columns = 
+                                         ({target_country : data_name[i]}))
+
+            else:  # otherwise, add to the df and then rename the column
+                temp_df = pd.DataFrame(temp_df.join(df))
+                temp_df = temp_df.rename(columns = 
+                                         ({target_country : data_name[i]}))
+
+        country_data.append(temp_df)  # add the df into a list
+
+    return country_data
+
+def multiSummaryStats(data, chosen_features = [], r = 3):
+
+    """
+    summary for multiple features 
+
+    Parameters
+    ----------
+    data : LIST
+        list containing pandas df.
+    chosen_features : LIST, optional
+        features to observe. The default is [] (all).
+    r : int, optional
+        rounding value. The default is 3.
+
+    Returns
+    -------
+    summarised_stats : LIST
+        returns list of df.
+
+    """
+
+    summarised_stats = []
+
+    itn = 0
+    for df in data:
+
+        # Checking to see if specific features have been selected
+        if chosen_features == []:
+            chosen_features = list(df)
+        else:
+            pass
+
+        total_summary = []
+
+        for feature in chosen_features:
+            summary = []
+            # Generating stats
+            feature_min = np.round(df[feature].min(), r)
+            feature_max = np.round(df[feature].max(), r)
+            # Finding dates of min/max and extracting the year only
+            min_date = df.index[ df[feature].argmin() ].year
+            max_date = df.index[ df[feature].argmax() ].year
+            # Finding the mean
+            mean = np.round(df[feature].mean(), r)
+            
+            # Add all elements to list
+            summary.extend([min_date, feature_min, max_date, feature_max, 
+                            mean])
+
+            # Add to total summary
+            total_summary.append(summary)
+
+        feature_df = pd.DataFrame(total_summary, index = chosen_features,
+                                  columns = ['Date:', 'Min', 'Date:', 'Max',
+                                             'Mean'])
+        feature_df.index.name = f'{country_names[itn]}'
+
+        print(f'{Fore.YELLOW + Style.BRIGHT}',
+                      f'{country_names[itn]}:{Fore.RESET}\n')
+        print(feature_df)
+
+        summarised_stats.append(feature_df)
+
+        itn += 1
+    
+    return summarised_stats
 """
 
 *** CODE ***
@@ -193,3 +430,18 @@ for df in data:
 # Taking a look at a heatmap to see any correlations
 data_2014 = snapshotData(clean_data, 2014, data_name)
 sns.heatmap(data_2014, cmap ='RdYlGn', linewidths = 0.30, annot = True)
+
+# Seperate countries and create new 'data' list
+data = seperateCountry(clean_data, data_name, country_names)
+world, uk, china, india, brazil, us, norway = data  # extract data 
+
+# Producing summary stats
+stat = multiSummaryStats(data, ['CO2 Emissions', 'GDP ($)'])
+
+# Plot time series of GDP v CO2
+plotTimeSeries(data, 'GDP ($)', 'CO2 Emissions',
+               labels = ['GDP vs CO2', 'Year'],
+               asset_set = country_names, produce_summary = True)
+
+# Plotting pairplot to observe any correlations between variables
+# sns.pairplot(uk);  # commented out as very intensive to run each time

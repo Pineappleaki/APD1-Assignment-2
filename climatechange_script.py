@@ -4,6 +4,7 @@ summaries which will be presented in a clean, readable format
 """
 # Import the modules needed
 import pandas as pd
+import seaborn as sns
 
 """
 *** FUNCTIONS ***
@@ -81,6 +82,59 @@ def selectCountries(df, selected_countries):
             pass
     return selective_df
 
+def snapshotData(data, year, feature_names=[], normalise = True):
+
+    """
+    Take data from a specific year for all or some indicators
+
+    Parameters
+    ----------
+    data : LIST
+        list containing pandas dataframe(s).
+    year : INT/STRING
+        The year to look at.
+    feature_names : LIST, optional
+        refine for only specific features. The default is [].
+    normalise : BOOL, optional
+        Whether to normalise values or not. The default is True.
+
+    Returns
+    -------
+    PANDAS_DATAFRAME
+        Data from a specific year including the indicators chosen.
+
+    """
+    
+    if isinstance(data, list) != True:  # Check data is a list
+        return 'Data must be a list!'
+    if isinstance(year, int):  # Correct int to a string
+        year = str(year)
+        
+    # Substitute feature names if names are missing
+    if feature_names == []:
+        for i in range(len(data)):
+            feature_names.append(f'Feature {i+1}')
+    elif feature_names != range(len(data)):
+        missing_names = ((len(data)) - len(feature_names))
+        for i in range(missing_names):
+            feature_names.append(f'NaN_{i+1}')
+        
+    snapshot = pd.DataFrame()  # Initalise dataframe
+    
+    for i in range(len(clean_data)):
+        df = clean_data[i]
+        if normalise is True:  # mean normalisation
+            normalise_df = (df - df.mean() ) / df.std()
+            df = normalise_df
+        temp = df.loc[year]
+        temp = temp.transpose()
+        
+        col_name = feature_names[i]  # get current feature name
+        data = temp.iloc[:, 0]
+        
+        snapshot[col_name] = data  # adding a column to the df each itn
+    
+    return snapshot
 
 """
 
@@ -135,3 +189,7 @@ for df in data:
     new_df = refineDataframe(new_df, years)
 
     clean_data.append(new_df)
+
+# Taking a look at a heatmap to see any correlations
+data_2014 = snapshotData(clean_data, 2014, data_name)
+sns.heatmap(data_2014, cmap ='RdYlGn', linewidths = 0.30, annot = True)
